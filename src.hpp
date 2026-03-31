@@ -156,6 +156,12 @@ class Memo {
           }
           delete to_delete;
           continue;
+        } else {
+          // This shouldn't happen based on the problem guarantee, but handle it anyway
+          // Just move forward
+          prev = current;
+          current = current->next;
+          continue;
         }
       } else if (notify_late != nullptr) {
         // NotifyLate or CustomNotifyLate event
@@ -209,9 +215,6 @@ class Memo {
         delete to_delete;
         continue;
       }
-
-      prev = current;
-      current = current->next;
     }
   }
 

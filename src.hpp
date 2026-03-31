@@ -9,12 +9,19 @@ inline std::string CustomNotifyLateEvent::GetNotification(int n) const {
 }
 
 // Simple linked list node structure
+enum EventType {
+  NORMAL_EVENT,
+  NOTIFY_BEFORE_EVENT,
+  NOTIFY_LATE_EVENT
+};
+
 struct EventNode {
   const Event* event;
+  EventType type;
   int notify_count;  // Track how many times this event has been notified
   EventNode* next;
 
-  EventNode(const Event* e) : event(e), notify_count(0), next(nullptr) {}
+  EventNode(const Event* e, EventType t) : event(e), type(t), notify_count(0), next(nullptr) {}
 };
 
 class Memo {
@@ -43,30 +50,30 @@ class Memo {
   }
 
   void AddEvent(const Event* event) {
-    // Determine which time slot to add this event to
+    // Determine which time slot to add this event to and its type
     int target_time = 0;
+    EventType event_type = NORMAL_EVENT;
 
     // Check the actual type of the event
-    const NormalEvent* normal_event = dynamic_cast<const NormalEvent*>(event);
     const NotifyBeforeEvent* notify_before = dynamic_cast<const NotifyBeforeEvent*>(event);
     const NotifyLateEvent* notify_late = dynamic_cast<const NotifyLateEvent*>(event);
 
     if (notify_before != nullptr) {
-      // For NotifyBefore events, add to the notify_time directly (not deadline - notify_time)
+      // For NotifyBefore events, add to the notify_time directly
       target_time = notify_before->GetNotifyTime();
+      event_type = NOTIFY_BEFORE_EVENT;
     } else if (notify_late != nullptr) {
       // For NotifyLate events (including CustomNotifyLate), add to deadline
       target_time = event->GetDeadline();
-    } else if (normal_event != nullptr) {
+      event_type = NOTIFY_LATE_EVENT;
+    } else {
       // For Normal events, add to deadline
       target_time = event->GetDeadline();
-    } else {
-      // Fallback to deadline
-      target_time = event->GetDeadline();
+      event_type = NORMAL_EVENT;
     }
 
     // Add to the tail of the corresponding list
-    EventNode* new_node = new EventNode(event);
+    EventNode* new_node = new EventNode(event, event_type);
 
     if (time_lists_[target_time] == nullptr) {
       time_lists_[target_time] = new_node;
@@ -108,10 +115,10 @@ class Memo {
       }
 
       // Event is not complete, need to notify
-      const NotifyBeforeEvent* notify_before = dynamic_cast<const NotifyBeforeEvent*>(event);
-      const NotifyLateEvent* notify_late = dynamic_cast<const NotifyLateEvent*>(event);
+      EventType event_type = current->type;
 
-      if (notify_before != nullptr) {
+      if (event_type == NOTIFY_BEFORE_EVENT) {
+        const NotifyBeforeEvent* notify_before = static_cast<const NotifyBeforeEvent*>(event);
         // Check if this is the notify time or deadline
         int notify_time = notify_before->GetNotifyTime();
         int deadline = notify_before->GetDeadline();
@@ -163,7 +170,8 @@ class Memo {
           current = current->next;
           continue;
         }
-      } else if (notify_late != nullptr) {
+      } else if (event_type == NOTIFY_LATE_EVENT) {
+        const NotifyLateEvent* notify_late = static_cast<const NotifyLateEvent*>(event);
         // NotifyLate or CustomNotifyLate event
         int frequency = notify_late->GetFrequency();
 
